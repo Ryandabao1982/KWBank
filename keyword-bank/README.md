@@ -37,3 +37,4 @@ It helps brands scale Amazon PPC campaigns without duplication, confusion, or wa
 - [Technical Development Plan](./TECHNICAL_PLAN.md)
 - [Work Breakdown Structure (WBS)](./WBS.md)
 - [UI/UX Plan](./UI_UX_PLAN.md)
+- [Agents & Responsibilities](./agents.md)
