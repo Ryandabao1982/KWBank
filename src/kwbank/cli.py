@@ -3,11 +3,16 @@ Command-line interface for KWBank
 """
 import click
 import csv
+import uuid
 from typing import List
 from pathlib import Path
 
 from .keyword_bank import KeywordBank
-from .models import Keyword, AdGroup, MatchType, KeywordType
+from .models import (
+    Keyword, AdGroup, MatchType, KeywordType, Brand, Product,
+    Mapping, NamingRule, KeywordIntent, KeywordStatus,
+    CampaignGoal, CampaignType, AutoManual
+)
 from .campaign_generator import CampaignNameGenerator
 from .amazon_exporter import AmazonBulkExporter
 from .audit_logger import AuditLogger
@@ -267,6 +272,343 @@ def stats():
         for brand in sorted(brands):
             brand_kws = bank.get_keywords_by_brand(brand)
             click.echo(f"  {brand}: {len(brand_kws)}")
+
+
+# Brand Management Commands
+@main.command()
+@click.option('--name', required=True, help='Brand name')
+@click.option('--prefix', required=True, help='Brand prefix for campaign names')
+@click.option('--budget', default=10.0, type=float, help='Default daily budget')
+@click.option('--bid', default=0.75, type=float, help='Default bid amount')
+@click.option('--account-id', default='', help='Amazon account ID')
+@click.option('--locale', default='en_US', help='Default locale (e.g., en_US)')
+def add_brand(name, prefix, budget, bid, account_id, locale):
+    """Add a new brand to the system"""
+    bank = KeywordBank()
+    audit = AuditLogger()
+    
+    # Generate unique brand ID
+    brand_id = f"brand_{uuid.uuid4().hex[:8]}"
+    
+    brand = Brand(
+        brand_id=brand_id,
+        name=name,
+        prefix=prefix,
+        default_budget=budget,
+        default_bid=bid,
+        account_id=account_id,
+        default_locale=locale
+    )
+    
+    if bank.add_brand(brand):
+        bank.save()
+        audit.log('add_brand', {
+            'brand_id': brand_id,
+            'name': name,
+            'prefix': prefix
+        })
+        click.echo(f"✓ Brand added: {name}")
+        click.echo(f"  ID: {brand_id}")
+        click.echo(f"  Prefix: {prefix}")
+        click.echo(f"  Default Budget: ${budget}")
+        click.echo(f"  Default Bid: ${bid}")
+    else:
+        click.echo(f"Error: Brand with ID {brand_id} already exists")
+
+
+@main.command()
+def list_brands():
+    """List all brands"""
+    bank = KeywordBank()
+    
+    brands = bank.get_all_brands_list()
+    
+    if not brands:
+        click.echo("No brands found.")
+        return
+    
+    click.echo(f"\n=== Brands ({len(brands)}) ===\n")
+    
+    for brand in brands:
+        click.echo(f"{brand.name} ({brand.prefix})")
+        click.echo(f"  ID: {brand.brand_id}")
+        click.echo(f"  Budget: ${brand.default_budget} | Bid: ${brand.default_bid}")
+        click.echo(f"  Account: {brand.account_id if brand.account_id else 'Not set'}")
+        click.echo(f"  Locale: {brand.default_locale}")
+        
+        # Show keyword and product counts
+        keywords = bank.get_keywords_by_brand(brand.name)
+        products = bank.get_products_by_brand(brand.brand_id)
+        click.echo(f"  Keywords: {len(keywords)} | Products: {len(products)}")
+        click.echo()
+
+
+# Product/ASIN Management Commands
+@main.command()
+@click.option('--brand', required=True, help='Brand name or ID')
+@click.option('--asin', required=True, help='Product ASIN')
+@click.option('--name', default='', help='Product name')
+@click.option('--category', default='', help='Product category')
+@click.option('--notes', default='', help='Notes about the product')
+def add_product(brand, asin, name, category, notes):
+    """Add a product/ASIN to a brand"""
+    bank = KeywordBank()
+    audit = AuditLogger()
+    
+    # Find brand by name or ID
+    brand_obj = bank.get_brand_by_name(brand) or bank.get_brand_by_id(brand)
+    
+    if not brand_obj:
+        click.echo(f"Error: Brand '{brand}' not found")
+        click.echo("Use 'kwbank list-brands' to see available brands")
+        return
+    
+    product = Product(
+        asin=asin,
+        brand_id=brand_obj.brand_id,
+        product_name=name,
+        category=category,
+        notes=notes
+    )
+    
+    if bank.add_product(product):
+        bank.save()
+        audit.log('add_product', {
+            'asin': asin,
+            'brand_id': brand_obj.brand_id,
+            'brand_name': brand_obj.name
+        })
+        click.echo(f"✓ Product added: {asin}")
+        click.echo(f"  Brand: {brand_obj.name}")
+        if name:
+            click.echo(f"  Name: {name}")
+        if category:
+            click.echo(f"  Category: {category}")
+    else:
+        click.echo(f"Error: Product {asin} already exists")
+
+
+@main.command()
+@click.option('--brand', help='Filter by brand name or ID')
+def list_products(brand):
+    """List all products/ASINs"""
+    bank = KeywordBank()
+    
+    if brand:
+        brand_obj = bank.get_brand_by_name(brand) or bank.get_brand_by_id(brand)
+        if not brand_obj:
+            click.echo(f"Error: Brand '{brand}' not found")
+            return
+        products = bank.get_products_by_brand(brand_obj.brand_id)
+        click.echo(f"\n=== Products for {brand_obj.name} ({len(products)}) ===\n")
+    else:
+        products = bank.products
+        click.echo(f"\n=== All Products ({len(products)}) ===\n")
+    
+    if not products:
+        click.echo("No products found.")
+        return
+    
+    for product in products:
+        brand_obj = bank.get_brand_by_id(product.brand_id)
+        brand_name = brand_obj.name if brand_obj else product.brand_id
+        
+        click.echo(f"{product.asin}")
+        click.echo(f"  Brand: {brand_name}")
+        if product.product_name:
+            click.echo(f"  Name: {product.product_name}")
+        if product.category:
+            click.echo(f"  Category: {product.category}")
+        if product.notes:
+            click.echo(f"  Notes: {product.notes}")
+        
+        # Show mappings count
+        mappings = bank.get_mappings_by_asin(product.asin)
+        click.echo(f"  Mappings: {len(mappings)}")
+        click.echo()
+
+
+# Naming Rule Commands
+@main.command()
+@click.option('--name', required=True, help='Rule name')
+@click.option('--pattern', required=True, help='Pattern with tokens (e.g., {BrandPrefix}_{ASIN}_{Goal}_{MatchType}_{Date:yyyyMMdd})')
+@click.option('--brand', help='Brand name or ID (optional, leave empty for global rule)')
+def add_naming_rule(name, pattern, brand):
+    """Add a campaign naming rule with pattern tokens"""
+    bank = KeywordBank()
+    audit = AuditLogger()
+    
+    brand_id = ''
+    if brand:
+        brand_obj = bank.get_brand_by_name(brand) or bank.get_brand_by_id(brand)
+        if not brand_obj:
+            click.echo(f"Error: Brand '{brand}' not found")
+            return
+        brand_id = brand_obj.brand_id
+    
+    # Generate example
+    example = CampaignNameGenerator.preview_pattern(pattern)
+    
+    rule = NamingRule(
+        pattern=pattern,
+        example=example,
+        name=name,
+        brand_id=brand_id
+    )
+    
+    bank.add_naming_rule(rule)
+    bank.save()
+    
+    audit.log('add_naming_rule', {
+        'name': name,
+        'pattern': pattern,
+        'brand_id': brand_id
+    })
+    
+    click.echo(f"✓ Naming rule added: {name}")
+    click.echo(f"  Pattern: {pattern}")
+    click.echo(f"  Example: {example}")
+    if brand:
+        click.echo(f"  Brand: {brand}")
+
+
+@main.command()
+@click.option('--brand', help='Filter by brand name or ID')
+def list_naming_rules(brand):
+    """List all naming rules"""
+    bank = KeywordBank()
+    
+    if brand:
+        brand_obj = bank.get_brand_by_name(brand) or bank.get_brand_by_id(brand)
+        if not brand_obj:
+            click.echo(f"Error: Brand '{brand}' not found")
+            return
+        rules = bank.get_naming_rules_by_brand(brand_obj.brand_id)
+        click.echo(f"\n=== Naming Rules for {brand_obj.name} ({len(rules)}) ===\n")
+    else:
+        rules = bank.naming_rules
+        click.echo(f"\n=== All Naming Rules ({len(rules)}) ===\n")
+    
+    if not rules:
+        click.echo("No naming rules found.")
+        return
+    
+    for rule in rules:
+        click.echo(f"{rule.name}")
+        click.echo(f"  Pattern: {rule.pattern}")
+        click.echo(f"  Example: {rule.example}")
+        if rule.brand_id:
+            brand_obj = bank.get_brand_by_id(rule.brand_id)
+            if brand_obj:
+                click.echo(f"  Brand: {brand_obj.name}")
+        else:
+            click.echo(f"  Scope: Global")
+        click.echo()
+
+
+@main.command()
+@click.argument('pattern')
+def test_naming_pattern(pattern):
+    """Test a naming pattern with example data"""
+    click.echo(f"Pattern: {pattern}\n")
+    
+    # Generate with default example data
+    example1 = CampaignNameGenerator.preview_pattern(pattern)
+    click.echo(f"Default Example: {example1}")
+    
+    # Generate with alternative data
+    example2 = CampaignNameGenerator.preview_pattern(
+        pattern,
+        {
+            'brand_prefix': 'ADIDAS',
+            'asin': 'B08EXAMPLE',
+            'goal': 'Awareness',
+            'match_type': 'Phrase',
+            'locale': 'de_DE'
+        }
+    )
+    click.echo(f"Alternative Example: {example2}")
+
+
+# Mapping Management Commands
+@main.command()
+@click.option('--asin', required=True, help='Product ASIN')
+@click.option('--keyword', required=True, help='Keyword text')
+@click.option('--campaign', default='', help='Campaign ID')
+@click.option('--ad-group', default='', help='Ad group name')
+@click.option('--bid', type=float, help='Bid override amount')
+@click.option('--notes', default='', help='Notes')
+def add_mapping(asin, keyword, campaign, ad_group, bid, notes):
+    """Add a keyword-to-ASIN mapping"""
+    bank = KeywordBank()
+    audit = AuditLogger()
+    
+    # Verify ASIN exists
+    product = bank.get_product_by_asin(asin)
+    if not product:
+        click.echo(f"Warning: ASIN {asin} not found in products")
+        click.echo("Mapping will be created anyway, but consider adding the product first")
+    
+    mapping = Mapping(
+        asin=asin,
+        keyword=keyword,
+        campaign_id=campaign,
+        ad_group=ad_group,
+        bid_override=bid,
+        notes=notes
+    )
+    
+    bank.add_mapping(mapping)
+    bank.save()
+    
+    audit.log('add_mapping', {
+        'asin': asin,
+        'keyword': keyword
+    })
+    
+    click.echo(f"✓ Mapping added")
+    click.echo(f"  ASIN: {asin}")
+    click.echo(f"  Keyword: {keyword}")
+    if campaign:
+        click.echo(f"  Campaign: {campaign}")
+    if ad_group:
+        click.echo(f"  Ad Group: {ad_group}")
+    if bid:
+        click.echo(f"  Bid Override: ${bid}")
+
+
+@main.command()
+@click.option('--asin', help='Filter by ASIN')
+@click.option('--keyword', help='Filter by keyword')
+def list_mappings(asin, keyword):
+    """List keyword-to-ASIN mappings"""
+    bank = KeywordBank()
+    
+    if asin:
+        mappings = bank.get_mappings_by_asin(asin)
+        click.echo(f"\n=== Mappings for ASIN {asin} ({len(mappings)}) ===\n")
+    elif keyword:
+        mappings = bank.get_mappings_by_keyword(keyword)
+        click.echo(f"\n=== Mappings for keyword '{keyword}' ({len(mappings)}) ===\n")
+    else:
+        mappings = bank.mappings
+        click.echo(f"\n=== All Mappings ({len(mappings)}) ===\n")
+    
+    if not mappings:
+        click.echo("No mappings found.")
+        return
+    
+    for mapping in mappings:
+        click.echo(f"ASIN: {mapping.asin} → Keyword: {mapping.keyword}")
+        if mapping.campaign_id:
+            click.echo(f"  Campaign: {mapping.campaign_id}")
+        if mapping.ad_group:
+            click.echo(f"  Ad Group: {mapping.ad_group}")
+        if mapping.bid_override:
+            click.echo(f"  Bid Override: ${mapping.bid_override}")
+        if mapping.notes:
+            click.echo(f"  Notes: {mapping.notes}")
+        click.echo()
 
 
 if __name__ == '__main__':
