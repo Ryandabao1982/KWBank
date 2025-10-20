@@ -48,3 +48,15 @@ audit_trail.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Node.js / Frontend
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.env*.local
