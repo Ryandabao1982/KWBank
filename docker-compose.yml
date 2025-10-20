@@ -1,0 +1,93 @@
+# KWBank Full Stack Docker Compose
+# This file starts all services needed for local development
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kwbank-postgres
+    environment:
+      POSTGRES_USER: kwbank
+      POSTGRES_PASSWORD: kwbank
+      POSTGRES_DB: kwbank
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kwbank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kwbank-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kwbank-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kwbank-network
+
+  # Backend API (NestJS)
+  # Uncomment to run backend in Docker (requires backend image to be built)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: kwbank-backend
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - DB_USERNAME=kwbank
+  #     - DB_PASSWORD=kwbank
+  #     - DB_NAME=kwbank
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - kwbank-network
+
+  # Frontend (Next.js)
+  # Uncomment to run frontend in Docker (requires frontend image to be built)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: kwbank-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - kwbank-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  kwbank-network:
+    driver: bridge
