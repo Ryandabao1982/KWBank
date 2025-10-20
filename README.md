@@ -7,11 +7,27 @@ It helps brands scale Amazon PPC campaigns without duplication, confusion, or wa
 
 ✅ **Multi-brand keyword storage** - Store and manage keywords for multiple brands in one centralized location  
 ✅ **Automated deduplication and normalization** - Automatically normalize and deduplicate keywords on import  
+✅ **Advanced fuzzy duplicate detection** - Find similar keywords using Jaro-Winkler similarity  
+✅ **Intent detection and bid suggestions** - Auto-classify keywords and suggest optimal bids  
+✅ **Pattern-based campaign naming** - Generate consistent names using customizable templates  
+✅ **Brand and product management** - Track brands, products, and ASINs with detailed metadata  
 ✅ **Conflict detection** - Detect overlaps between positive and negative keywords  
 ✅ **ASIN → Ad Group → Campaign mapping** - Map ASINs to ad groups and generate complete campaigns  
-✅ **Auto campaign name generation** - Generate consistent, descriptive campaign names automatically  
 ✅ **Export-ready Amazon bulk CSVs** - Export campaigns in Amazon Advertising bulk upload format  
 ✅ **Audit trail** - Track all operations with detailed audit logging
+
+## What's New in Enhanced Version
+
+🎯 **Multi-Brand Management**: Define brands with prefixes, default budgets, and account IDs  
+🎯 **Smart Intent Detection**: Automatically classify keywords as Awareness, Consideration, or Conversion  
+🎯 **Fuzzy Deduplication**: Detect similar keywords like "running shoes" vs "runing shoes"  
+🎯 **Pattern-Based Naming**: Use tokens like `{BrandPrefix}_{ASIN}_{Goal}_{Date:yyyyMMdd}`  
+🎯 **Enhanced Normalization**: Remove diacritics, punctuation, and handle special characters  
+🎯 **Suggested Bids**: Auto-calculate bids based on keyword intent (Conversion = 1.5x base)  
+🎯 **Product/ASIN Tracking**: Associate ASINs with brands and track metadata  
+🎯 **Keyword-ASIN Mappings**: Plan campaigns with explicit keyword-to-product mappings
+
+📖 **See [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for detailed documentation**
 
 ## Installation
 
@@ -35,63 +51,136 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Import Keywords
+### Basic Usage (Original)
 
-Create a CSV file with keywords (one per line):
-```csv
-running shoes
-basketball sneakers
-athletic footwear
-```
-
-Import the keywords:
 ```bash
+# Import keywords
 kwbank import-keywords keywords.csv --brand "Nike" --keyword-type positive --match-type exact
-```
 
-### 2. Check for Conflicts
-
-Detect overlaps between positive and negative keywords:
-```bash
+# Detect conflicts
 kwbank detect-conflicts
+
+# Create campaign
+kwbank create-campaign --brand "Nike" --asin B08XYZ123 --output campaign.csv
 ```
 
-### 3. Create a Campaign
+### Enhanced Usage (New)
 
-Generate a campaign with ASINs and keywords:
 ```bash
-kwbank create-campaign \
+# Setup brand
+kwbank add-brand --name "Nike" --prefix "NIKE" --budget 50.0 --bid 1.25
+
+# Add product
+kwbank add-product --brand "Nike" --asin "B07X9C8N6D" --name "Nike Air Max 270"
+
+# Enhanced import with intent detection
+kwbank import-keywords keywords.csv \
   --brand "Nike" \
-  --asin B08XYZ123 \
-  --asin B08ABC456 \
-  --strategy manual \
-  --output data/exports/nike_campaign.csv
+  --keyword-type positive \
+  --match-type exact \
+  --enhanced \
+  --auto-detect-intent
+
+# Find fuzzy duplicates
+kwbank find-fuzzy-duplicates --brand "Nike"
+
+# Create naming rule
+kwbank add-naming-rule \
+  --name "standard" \
+  --pattern "{BrandPrefix}_{ASIN}_{Goal}_{MatchType}_{Date:yyyyMMdd}"
+
+# Test pattern
+kwbank test-naming-pattern "{BrandPrefix}_{ASIN}_{Goal}_{MatchType}_{Date:yyyyMMdd}"
+
+# Create mapping
+kwbank add-mapping --asin "B07X9C8N6D" --keyword "buy nike shoes" --bid 1.75
 ```
 
-### 4. View Statistics
+### Run the Enhanced Demo
 
 ```bash
-kwbank stats
-```
-
-### 5. View Audit Trail
-
-```bash
-kwbank audit-trail --count 20
+# See all features in action
+./demo_enhanced.sh
 ```
 
 ## Usage Guide
 
-### Commands
+### Core Commands
 
-#### Import Keywords
+#### Brand Management (New)
 ```bash
+# Add a brand
+kwbank add-brand --name "Nike" --prefix "NIKE" --budget 50.0 --bid 1.25
+
+# List brands
+kwbank list-brands
+```
+
+#### Product Management (New)
+```bash
+# Add a product/ASIN
+kwbank add-product --brand "Nike" --asin "B07X9C8N6D" --name "Nike Air Max 270"
+
+# List products
+kwbank list-products [--brand "Nike"]
+```
+
+#### Naming Rules (New)
+```bash
+# Add a naming rule with pattern tokens
+kwbank add-naming-rule --name "standard" \
+  --pattern "{BrandPrefix}_{ASIN}_{Goal}_{MatchType}_{Date:yyyyMMdd}"
+
+# Test a pattern
+kwbank test-naming-pattern "{BrandPrefix}_{Goal}_{Date:yyyyMMdd}"
+
+# List naming rules
+kwbank list-naming-rules
+```
+
+#### Import Keywords (Enhanced)
+```bash
+# Basic import (original)
 kwbank import-keywords <csv_file> --brand <brand_name> [options]
+
+# Enhanced import with intent detection
+kwbank import-keywords keywords.csv \
+  --brand "Nike" \
+  --keyword-type positive \
+  --match-type exact \
+  --enhanced \
+  --auto-detect-intent
 
 Options:
   --brand TEXT              Brand name for the keywords (required)
   --keyword-type [positive|negative]  Type of keywords (default: positive)
   --match-type [exact|phrase|broad]   Match type (default: exact)
+  --enhanced/--basic        Use enhanced normalization (default: basic)
+  --auto-detect-intent/--no-auto-detect-intent  Auto-detect intent (default: yes)
+```
+
+#### Duplicate Detection (New)
+```bash
+# Find exact duplicates
+kwbank find-exact-duplicates [--brand <brand>]
+
+# Find fuzzy duplicates (similar keywords)
+kwbank find-fuzzy-duplicates [--brand <brand>] [--threshold 0.92]
+
+# Find variant duplicates (same stem)
+kwbank find-variant-duplicates [--brand <brand>]
+
+# Detect positive/negative conflicts
+kwbank detect-conflicts
+```
+
+#### Mapping Management (New)
+```bash
+# Create keyword-to-ASIN mapping
+kwbank add-mapping --asin "B07X9C8N6D" --keyword "buy nike shoes" --bid 1.75
+
+# List mappings
+kwbank list-mappings [--asin <asin>] [--keyword <keyword>]
 ```
 
 #### List Keywords
