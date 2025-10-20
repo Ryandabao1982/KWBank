@@ -16,6 +16,26 @@ It helps brands scale Amazon PPC campaigns without duplication, confusion, or wa
 ✅ **Export-ready Amazon bulk CSVs** - Export campaigns in Amazon Advertising bulk upload format  
 ✅ **Audit trail** - Track all operations with detailed audit logging
 
+## Architecture
+
+KWBank now provides **two interfaces** for managing your keyword data:
+
+### 1. Python CLI (Original)
+Command-line interface for power users with JSON file storage.
+- **Storage**: JSON files in `/data` directory
+- **Best for**: Local usage, scripting, automation
+- **See**: [CLI Documentation](#usage-guide) below
+
+### 2. REST API Backend (New)
+Enterprise-grade backend with PostgreSQL database and REST API.
+- **Stack**: NestJS + TypeORM + PostgreSQL + Redis
+- **Storage**: PostgreSQL database with proper relationships
+- **API**: RESTful endpoints at `http://localhost:3001/api`
+- **Best for**: Web applications, multi-user environments, production deployments
+- **See**: [Backend Quick Start](backend/QUICKSTART.md) | [Backend Documentation](backend/README.md)
+
+Both interfaces share the same data models and can be used independently or together.
+
 ## What's New in Enhanced Version
 
 🎯 **Multi-Brand Management**: Define brands with prefixes, default budgets, and account IDs  
@@ -31,11 +51,13 @@ It helps brands scale Amazon PPC campaigns without duplication, confusion, or wa
 
 ## Installation
 
-### Prerequisites
+### Python CLI
+
+#### Prerequisites
 - Python 3.8 or higher
 - pip package manager
 
-### Install from source
+#### Install from source
 
 ```bash
 # Clone the repository
@@ -48,6 +70,31 @@ pip install -r requirements.txt
 # Install the package
 pip install -e .
 ```
+
+### Backend API (Optional)
+
+#### Prerequisites
+- Node.js 18+ and npm
+- Docker and Docker Compose (for PostgreSQL and Redis)
+
+#### Quick Setup
+
+```bash
+cd backend
+
+# Start PostgreSQL and Redis
+docker-compose up -d
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run start:dev
+```
+
+The API will be available at `http://localhost:3001/api`
+
+**📖 For detailed backend setup and usage, see [Backend Quick Start Guide](backend/QUICKSTART.md)**
 
 ## Quick Start
 
@@ -341,6 +388,50 @@ kwbank create-campaign --brand "Adidas" --asin B08ADIDAS01 --output adidas_campa
 - Includes all required sections and columns
 - Ready for direct upload to Amazon Advertising
 
+## Backend REST API
+
+The backend provides a comprehensive REST API for programmatic access to all KWBank features.
+
+### Base URL
+```
+http://localhost:3001/api
+```
+
+### Quick Examples
+
+```bash
+# Create a brand
+curl -X POST http://localhost:3001/api/brands \
+  -H "Content-Type: application/json" \
+  -d '{"brand_id":"nike","name":"Nike","prefix":"NIKE","default_budget":50.0,"default_bid":1.25}'
+
+# List all brands
+curl http://localhost:3001/api/brands
+
+# Add keywords in batch
+curl -X POST http://localhost:3001/api/keywords/batch \
+  -H "Content-Type: application/json" \
+  -d '[{"text":"nike shoes","brand_id":"nike","match_type":"exact","keyword_type":"positive"}]'
+
+# Get keyword statistics
+curl http://localhost:3001/api/keywords/stats?brand_id=nike
+
+# Find duplicates
+curl http://localhost:3001/api/keywords/duplicates?brand_id=nike
+
+# Detect conflicts
+curl http://localhost:3001/api/keywords/conflicts?brand_id=nike
+```
+
+### Available Endpoints
+
+**Brands**: `/api/brands` - Full CRUD operations  
+**Products**: `/api/products` - ASIN management  
+**Keywords**: `/api/keywords` - Keyword management with filtering, stats, duplicates, conflicts  
+**Mappings**: `/api/mappings` - Keyword-to-ASIN mappings
+
+**📖 Complete API documentation**: [Backend README](backend/README.md) | [Quick Start Guide](backend/QUICKSTART.md)
+
 ## Development
 
 ### Running Tests
@@ -356,13 +447,33 @@ pytest --cov=kwbank
 ```
 
 ### Project Structure
-The project follows a modular architecture:
-- `models.py` - Data models and types
-- `keyword_bank.py` - Core business logic
-- `campaign_generator.py` - Campaign naming utilities
-- `amazon_exporter.py` - CSV export functionality
-- `audit_logger.py` - Audit trail system
-- `cli.py` - Command-line interface
+```
+KWBank/
+├── backend/                # NestJS REST API Backend
+│   ├── src/
+│   │   ├── brands/        # Brand management module
+│   │   ├── products/      # Product/ASIN module
+│   │   ├── keywords/      # Keyword management module
+│   │   ├── mappings/      # Mapping module
+│   │   ├── entities/      # TypeORM database entities
+│   │   └── config/        # Configuration
+│   ├── docker-compose.yml # PostgreSQL + Redis setup
+│   ├── QUICKSTART.md      # Backend quick start guide
+│   └── README.md          # Backend documentation
+├── src/
+│   └── kwbank/            # Python CLI
+│       ├── models.py      # Data models and types
+│       ├── keyword_bank.py # Core business logic
+│       ├── campaign_generator.py # Campaign naming
+│       ├── amazon_exporter.py # CSV export
+│       ├── audit_logger.py # Audit trail
+│       ├── text_utils.py  # Text processing utilities
+│       └── cli.py         # Command-line interface
+├── frontend/              # Next.js Web UI
+├── data/                  # JSON file storage (CLI)
+├── requirements.txt       # Python dependencies
+└── README.md              # This file
+```
 
 ## Contributing
 
