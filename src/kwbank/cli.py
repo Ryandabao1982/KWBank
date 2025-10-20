@@ -37,8 +37,11 @@ def main():
               default='positive', help='Type of keywords to import')
 @click.option('--match-type', type=click.Choice(['exact', 'phrase', 'broad']), 
               default='exact', help='Default match type for keywords')
-def import_keywords(csv_file, brand, keyword_type, match_type):
-    """Import keywords from a CSV file"""
+@click.option('--enhanced/--basic', default=False, help='Use enhanced normalization')
+@click.option('--auto-detect-intent/--no-auto-detect-intent', default=True, 
+              help='Auto-detect keyword intent and suggest bids')
+def import_keywords(csv_file, brand, keyword_type, match_type, enhanced, auto_detect_intent):
+    """Import keywords from a CSV file with enhanced processing"""
     bank = KeywordBank()
     audit = AuditLogger()
     
@@ -64,22 +67,60 @@ def import_keywords(csv_file, brand, keyword_type, match_type):
                     keyword_type=KeywordType(keyword_type)
                 ))
     
-    added, duplicates = bank.import_keywords(keywords)
-    bank.save()
-    
-    audit.log('import_keywords', {
-        'file': csv_file,
-        'brand': brand,
-        'added': added,
-        'duplicates': duplicates,
-        'keyword_type': keyword_type,
-        'match_type': match_type
-    })
-    
-    click.echo(f"✓ Imported {added} keywords ({duplicates} duplicates skipped)")
-    click.echo(f"  Brand: {brand}")
-    click.echo(f"  Type: {keyword_type}")
-    click.echo(f"  Match Type: {match_type}")
+    # Use enhanced import if requested
+    if enhanced or auto_detect_intent:
+        added, duplicates, stats = bank.import_keywords_enhanced(
+            keywords,
+            auto_enhance=auto_detect_intent,
+            normalization_mode='enhanced' if enhanced else 'basic'
+        )
+        bank.save()
+        
+        audit.log('import_keywords_enhanced', {
+            'file': csv_file,
+            'brand': brand,
+            'added': added,
+            'duplicates': duplicates,
+            'fuzzy_duplicates': stats.get('fuzzy_duplicates', 0),
+            'enhanced': stats.get('enhanced', 0),
+            'keyword_type': keyword_type,
+            'match_type': match_type,
+            'intents': dict(stats.get('intents_detected', {}))
+        })
+        
+        click.echo(f"✓ Imported {added} keywords ({duplicates} duplicates skipped)")
+        click.echo(f"  Brand: {brand}")
+        click.echo(f"  Type: {keyword_type}")
+        click.echo(f"  Match Type: {match_type}")
+        
+        if stats.get('fuzzy_duplicates', 0) > 0:
+            click.echo(f"  Fuzzy duplicates detected: {stats['fuzzy_duplicates']}")
+        
+        if auto_detect_intent and stats.get('enhanced', 0) > 0:
+            click.echo(f"  Keywords enhanced: {stats['enhanced']}")
+            intents = stats.get('intents_detected', {})
+            if intents:
+                click.echo("  Intent distribution:")
+                for intent, count in intents.items():
+                    click.echo(f"    {intent}: {count}")
+    else:
+        # Use basic import
+        added, duplicates = bank.import_keywords(keywords)
+        bank.save()
+        
+        audit.log('import_keywords', {
+            'file': csv_file,
+            'brand': brand,
+            'added': added,
+            'duplicates': duplicates,
+            'keyword_type': keyword_type,
+            'match_type': match_type
+        })
+        
+        click.echo(f"✓ Imported {added} keywords ({duplicates} duplicates skipped)")
+        click.echo(f"  Brand: {brand}")
+        click.echo(f"  Type: {keyword_type}")
+        click.echo(f"  Match Type: {match_type}")
 
 
 @main.command()
@@ -608,6 +649,75 @@ def list_mappings(asin, keyword):
             click.echo(f"  Bid Override: ${mapping.bid_override}")
         if mapping.notes:
             click.echo(f"  Notes: {mapping.notes}")
+        click.echo()
+
+
+# Advanced Deduplication Commands
+@main.command()
+@click.option('--brand', help='Filter by brand')
+@click.option('--threshold', default=0.92, type=float, help='Similarity threshold (0.0-1.0)')
+def find_fuzzy_duplicates(brand, threshold):
+    """Find fuzzy duplicate keywords using similarity matching"""
+    bank = KeywordBank()
+    
+    click.echo(f"Searching for fuzzy duplicates (threshold: {threshold})...\n")
+    
+    fuzzy_dupes = bank.find_fuzzy_duplicates(brand, threshold)
+    
+    if not fuzzy_dupes:
+        click.echo("✓ No fuzzy duplicates found!")
+        return
+    
+    click.echo(f"⚠ Found {len(fuzzy_dupes)} fuzzy duplicate pairs:\n")
+    
+    for dupe in fuzzy_dupes:
+        click.echo(f"Brand: {dupe['brand']}")
+        click.echo(f"  Keyword 1: {dupe['keyword1']}")
+        click.echo(f"  Keyword 2: {dupe['keyword2']}")
+        click.echo(f"  Similarity: {dupe['similarity']:.2%}")
+        click.echo(f"  Type: {dupe['type']}")
+        click.echo()
+
+
+@main.command()
+@click.option('--brand', help='Filter by brand')
+def find_variant_duplicates(brand):
+    """Find variant duplicates using stemming"""
+    bank = KeywordBank()
+    
+    variants = bank.find_variant_duplicates(brand)
+    
+    if not variants:
+        click.echo("✓ No variant duplicates found!")
+        return
+    
+    click.echo(f"⚠ Found {len(variants)} variant groups:\n")
+    
+    for stem, keywords in variants.items():
+        click.echo(f"Stem: {stem}")
+        for kw in keywords:
+            click.echo(f"  - {kw.text} ({kw.brand}, {kw.keyword_type.value})")
+        click.echo()
+
+
+@main.command()
+@click.option('--brand', help='Filter by brand')
+def find_exact_duplicates(brand):
+    """Find exact duplicate keywords"""
+    bank = KeywordBank()
+    
+    duplicates = bank.find_exact_duplicates(brand)
+    
+    if not duplicates:
+        click.echo("✓ No exact duplicates found!")
+        return
+    
+    click.echo(f"⚠ Found {len(duplicates)} exact duplicate groups:\n")
+    
+    for normalized, keywords in duplicates.items():
+        click.echo(f"Normalized: {normalized}")
+        for kw in keywords:
+            click.echo(f"  - {kw.text} ({kw.brand}, {kw.keyword_type.value}, {kw.match_type.value})")
         click.echo()
 
 

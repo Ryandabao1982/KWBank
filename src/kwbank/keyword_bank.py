@@ -11,6 +11,7 @@ from .models import (
     Keyword, AdGroup, Campaign, KeywordType, MatchType,
     Brand, Product, Mapping, NamingRule, KeywordIntent, KeywordStatus
 )
+from .text_utils import TextNormalizer, SimilarityChecker, IntentDetector
 
 
 class KeywordBank:
@@ -306,3 +307,181 @@ class KeywordBank:
             if rule.name == name:
                 return rule
         return None
+    
+    # Advanced deduplication methods
+    def find_exact_duplicates(self, brand: str = None) -> Dict[str, List[Keyword]]:
+        """
+        Find exact duplicates based on normalized text
+        Returns dict mapping normalized text to list of duplicate keywords
+        """
+        keywords = self.keywords if not brand else self.get_keywords_by_brand(brand)
+        
+        duplicates = defaultdict(list)
+        for kw in keywords:
+            duplicates[kw.normalized_text].append(kw)
+        
+        # Only return entries with more than one keyword
+        return {k: v for k, v in duplicates.items() if len(v) > 1}
+    
+    def find_fuzzy_duplicates(
+        self,
+        brand: str = None,
+        threshold: float = 0.92
+    ) -> List[Dict]:
+        """
+        Find fuzzy duplicates using similarity comparison
+        
+        Args:
+            brand: Filter by brand
+            threshold: Similarity threshold (0.0-1.0), default 0.92
+        
+        Returns:
+            List of dictionaries with fuzzy duplicate pairs and confidence scores
+        """
+        keywords = self.keywords if not brand else self.get_keywords_by_brand(brand)
+        
+        fuzzy_dupes = []
+        checked_pairs = set()
+        
+        for i, kw1 in enumerate(keywords):
+            for kw2 in keywords[i+1:]:
+                # Skip if different types or already checked
+                if kw1.keyword_type != kw2.keyword_type:
+                    continue
+                
+                pair = tuple(sorted([kw1.text, kw2.text]))
+                if pair in checked_pairs:
+                    continue
+                
+                checked_pairs.add(pair)
+                
+                # Check similarity
+                similarity = SimilarityChecker.jaro_winkler_similarity(
+                    kw1.normalized_text,
+                    kw2.normalized_text
+                )
+                
+                if similarity >= threshold:
+                    fuzzy_dupes.append({
+                        'keyword1': kw1.text,
+                        'keyword2': kw2.text,
+                        'similarity': similarity,
+                        'brand': kw1.brand,
+                        'type': kw1.keyword_type.value
+                    })
+        
+        return fuzzy_dupes
+    
+    def find_variant_duplicates(self, brand: str = None) -> Dict[str, List[Keyword]]:
+        """
+        Find variant duplicates using stemming
+        Groups keywords with the same stemmed form
+        """
+        keywords = self.keywords if not brand else self.get_keywords_by_brand(brand)
+        
+        variants = defaultdict(list)
+        for kw in keywords:
+            stemmed = TextNormalizer.stem_text(kw.normalized_text)
+            variants[stemmed].append(kw)
+        
+        # Only return entries with more than one keyword
+        return {k: v for k, v in variants.items() if len(v) > 1}
+    
+    def enhance_keyword_metadata(self, keyword: Keyword) -> Keyword:
+        """
+        Enhance keyword with auto-detected metadata
+        - Intent detection
+        - Suggested bid based on intent
+        """
+        # Detect intent if not already set
+        if keyword.intent == KeywordIntent.UNKNOWN:
+            intent_str = IntentDetector.detect_intent(keyword.text)
+            keyword.intent = KeywordIntent(intent_str)
+        
+        # Suggest bid if not already set
+        if keyword.suggested_bid is None:
+            # Get brand to use default bid
+            brand = self.get_brand_by_name(keyword.brand)
+            if brand:
+                base_bid = brand.default_bid
+                multiplier = IntentDetector.suggest_bid_multiplier(keyword.intent.value)
+                keyword.suggested_bid = round(base_bid * multiplier, 2)
+        
+        return keyword
+    
+    def import_keywords_enhanced(
+        self,
+        keywords: List[Keyword],
+        auto_enhance: bool = True,
+        normalization_mode: str = 'enhanced'
+    ) -> Tuple[int, int, Dict]:
+        """
+        Import keywords with enhanced processing
+        
+        Args:
+            keywords: List of keywords to import
+            auto_enhance: Auto-detect intent and suggest bids
+            normalization_mode: 'basic' or 'enhanced'
+        
+        Returns:
+            (added_count, duplicate_count, stats_dict)
+        """
+        added = 0
+        duplicates = 0
+        stats = {
+            'fuzzy_duplicates': 0,
+            'enhanced': 0,
+            'intents_detected': defaultdict(int)
+        }
+        
+        # Create a set of existing normalized keywords
+        existing_normalized = {
+            (k.normalized_text, k.keyword_type, k.brand): k 
+            for k in self.keywords
+        }
+        
+        for keyword in keywords:
+            # Apply enhanced normalization if requested
+            if normalization_mode == 'enhanced':
+                keyword.normalized_text = TextNormalizer.normalize_enhanced(
+                    keyword.text,
+                    remove_diacritics=True,
+                    remove_punctuation=True,
+                    remove_stop_words=False
+                )
+            
+            # Check for exact duplicates
+            key = (keyword.normalized_text, keyword.keyword_type, keyword.brand)
+            if key in existing_normalized:
+                duplicates += 1
+                continue
+            
+            # Check for fuzzy duplicates among existing
+            is_fuzzy_dupe = False
+            for existing_kw in self.keywords:
+                if (existing_kw.brand == keyword.brand and 
+                    existing_kw.keyword_type == keyword.keyword_type):
+                    if SimilarityChecker.are_fuzzy_duplicates(
+                        keyword.normalized_text,
+                        existing_kw.normalized_text
+                    ):
+                        is_fuzzy_dupe = True
+                        stats['fuzzy_duplicates'] += 1
+                        break
+            
+            if is_fuzzy_dupe:
+                duplicates += 1
+                continue
+            
+            # Auto-enhance metadata
+            if auto_enhance:
+                keyword = self.enhance_keyword_metadata(keyword)
+                stats['enhanced'] += 1
+                stats['intents_detected'][keyword.intent.value] += 1
+            
+            # Add keyword
+            self.keywords.append(keyword)
+            existing_normalized[key] = keyword
+            added += 1
+        
+        return added, duplicates, stats
