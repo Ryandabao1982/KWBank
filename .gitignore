@@ -47,7 +47,7 @@ audit_trail.log
 .DS_Store
 Thumbs.db
 
-# Node.js / Frontend
+# Node.js / Frontend / Backend
 node_modules/
 .next/
 out/
@@ -57,4 +57,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .env*.local
+.env
 frontend/build/
+backend/dist/
+backend/.env
