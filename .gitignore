@@ -36,6 +36,8 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+data/keyword_bank.json
+data/audit_trail.json
 data/exports/*.csv
 data/backups/*.json
 
