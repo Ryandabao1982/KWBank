@@ -1,12 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository, Like, FindOptionsWhere } from 'typeorm';
 import {
   Keyword,
   MatchType,
   KeywordType,
   KeywordIntent,
-  KeywordStatus,
 } from '../entities/keyword.entity';
 import {
   CreateKeywordDto,
@@ -26,7 +25,7 @@ export class KeywordsService {
   }
 
   async findAll(filters?: KeywordFilters): Promise<Keyword[]> {
-    const where: any = {};
+    const where: FindOptionsWhere<Keyword> = {};
 
     if (filters?.brand_id) where.brand_id = filters.brand_id;
     if (filters?.keyword_type) where.keyword_type = filters.keyword_type;
@@ -37,11 +36,12 @@ export class KeywordsService {
       where.normalized_text = Like(`%${this.normalizeText(filters.search)}%`);
     }
 
-    return this.keywordsRepository.find({
+    const keywords = await this.keywordsRepository.find({
       where,
       relations: ['brand'],
       order: { created_at: 'DESC' },
     });
+    return keywords;
   }
 
   async findOne(id: string): Promise<Keyword> {
@@ -146,7 +146,7 @@ export class KeywordsService {
   }
 
   async count(filters?: KeywordFilters): Promise<number> {
-    const where: any = {};
+    const where: FindOptionsWhere<Keyword> = {};
 
     if (filters?.brand_id) where.brand_id = filters.brand_id;
     if (filters?.keyword_type) where.keyword_type = filters.keyword_type;
@@ -154,7 +154,8 @@ export class KeywordsService {
     if (filters?.intent) where.intent = filters.intent;
     if (filters?.status) where.status = filters.status;
 
-    return this.keywordsRepository.count({ where });
+    const count = await this.keywordsRepository.count({ where });
+    return count;
   }
 
   async getStats(brand_id?: string): Promise<any> {

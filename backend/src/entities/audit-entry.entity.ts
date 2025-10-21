@@ -1,8 +1,13 @@
-import { Entity, Column, PrimaryColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+} from 'typeorm';
 
 @Entity('audit_entries')
 export class AuditEntry {
-  @PrimaryColumn({ type: 'uuid' })
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @CreateDateColumn()
@@ -11,7 +16,13 @@ export class AuditEntry {
   @Column({ type: 'varchar', length: 100 })
   action: string;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  entity_type: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  entity_id: string;
+
+  @Column({ type: 'jsonb', nullable: true })
   details: Record<string, any>;
 
   @Column({ type: 'varchar', length: 100, default: 'system' })
