@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { IMPORT_QUEUE, EXPORT_QUEUE, ImportJobData, ExportJobData } from './queue.types';
+import {
+  IMPORT_QUEUE,
+  EXPORT_QUEUE,
+  ImportJobData,
+  ExportJobData,
+} from './queue.types';
 
 @Injectable()
 export class QueueService {

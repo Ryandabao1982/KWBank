@@ -1,118 +1,47 @@
-# KWBank Full Stack Docker Compose
-# This file starts all services needed for local development
-
 version: '3.8'
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: kwbank-postgres
+  db:
+    image: postgres:16
     environment:
-      POSTGRES_USER: kwbank
-      POSTGRES_PASSWORD: kwbank
       POSTGRES_DB: kwbank
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kwbank"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - kwbank-network
-
-  # Redis Cache & Queue
+      - db-data:/var/lib/postgresql/data
   redis:
-    image: redis:7-alpine
-    container_name: kwbank-redis
+    image: redis:7
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - kwbank-network
-
-  # Python NLP Microservice
-  python-nlp:
-    build:
-      context: ./python-nlp
-      dockerfile: Dockerfile
-    container_name: kwbank-python-nlp
-    ports:
-      - "8000:8000"
-    environment:
-      - PORT=8000
-      - HOST=0.0.0.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - kwbank-network
-
-  # Backend API (NestJS)
+      - '6379:6379'
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: kwbank-backend
+    env_file:
+      - backend/.env.example
     ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USERNAME=kwbank
-      - DB_PASSWORD=kwbank
-      - DB_NAME=kwbank
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - JWT_SECRET=your-secret-key-change-in-production
+      - '3001:3001'
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      python-nlp:
-        condition: service_started
-    volumes:
-      - backend_uploads:/app/uploads
-    networks:
-      - kwbank-network
-
-  # Frontend (Next.js)
-  frontend:
+      - db
+      - redis
+      - python-nlp
+  worker:
     build:
-      context: ./frontend
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: kwbank-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    command: node dist/worker/worker.js
+    env_file:
+      - backend/.env.example
     depends_on:
-      - backend
-    networks:
-      - kwbank-network
-
+      - redis
+      - db
+      - python-nlp
+  python-nlp:
+    build:
+      context: ./python-nlp
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
 volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  backend_uploads:
-    driver: local
-
-networks:
-  kwbank-network:
-    driver: bridge
+  db-data: {}

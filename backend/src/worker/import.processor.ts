@@ -21,7 +21,7 @@ export class ImportProcessor extends WorkerHost {
       // 6. Update import record status
 
       this.logger.log(`Import job ${job.id} completed successfully`);
-      
+
       return {
         import_id,
         status: 'completed',
