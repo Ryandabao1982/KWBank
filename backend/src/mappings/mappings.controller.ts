@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { MappingsService } from './mappings.service';
 import { Mapping } from '../entities/mapping.entity';
 import { CreateMappingDto, UpdateMappingDto } from './dto/mapping.dto';

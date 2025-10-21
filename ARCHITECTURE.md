@@ -2,44 +2,73 @@
 
 ## System Overview
 
+KWBank provides two interfaces: a Python CLI for local usage and a modern web application with a modular backend architecture.
+
+### Architecture Diagram
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         KWBank CLI                          │
-│                  (Command-Line Interface)                   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│   Keyword    │   │   Campaign   │   │    Audit     │
-│    Bank      │   │  Generator   │   │   Logger     │
-│              │   │              │   │              │
-│ - Import     │   │ - Mapping    │   │ - Track All  │
-│ - Dedupe     │   │ - Naming     │   │   Actions    │
-│ - Conflict   │   │ - Validation │   │ - Query      │
-└──────────────┘   └──────────────┘   └──────────────┘
-        │                   │                   │
-        └───────────────────┼───────────────────┘
-                            ▼
-                  ┌──────────────────┐
-                  │  Amazon Bulk     │
-                  │  CSV Exporter    │
-                  │                  │
-                  │ - Campaign CSV   │
-                  │ - Ad Groups CSV  │
-                  │ - Keywords CSV   │
-                  └──────────────────┘
-                            │
-                            ▼
-                  ┌──────────────────┐
-                  │   Data Storage   │
-                  │                  │
-                  │ - keyword_bank   │
-                  │   .json          │
-                  │ - audit_trail    │
-                  │   .json          │
-                  └──────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Frontend (Next.js)                             │
+│                       http://localhost:3000                             │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ REST API
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Backend API (NestJS)                               │
+│                    http://localhost:3001/api                            │
+│                                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
+│  │ Import   │  │ Dedupe   │  │ Naming   │  │  Audit   │  │  Auth   │ │
+│  │ Module   │  │ Module   │  │ Module   │  │  Module  │  │ Module  │ │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Keywords │  │ Brands   │  │ Products │  │ Mappings │              │
+│  │ Module   │  │ Module   │  │ Module   │  │  Module  │              │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘              │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────┐             │
+│  │              Queue Module (BullMQ)                   │             │
+│  │   - Import Queue    - Export Queue                   │             │
+│  └──────────────────────────────────────────────────────┘             │
+└────────┬──────────────────────────────────────┬────────────────────────┘
+         │                                      │
+         ▼                                      ▼
+┌──────────────────────┐              ┌──────────────────────┐
+│  PostgreSQL          │              │  Redis               │
+│  - Entity Storage    │              │  - Queue Storage     │
+│  - Relationships     │              │  - Cache Layer       │
+└──────────────────────┘              └──────────────────────┘
+         │                                      │
+         └──────────────┬───────────────────────┘
+                        ▼
+         ┌──────────────────────────────────────┐
+         │         Worker Processes              │
+         │                                       │
+         │  ┌─────────────┐  ┌────────────────┐ │
+         │  │   Import    │  │     Export     │ │
+         │  │  Processor  │  │   Processor    │ │
+         │  └─────────────┘  └────────────────┘ │
+         └───────────────┬──────────────────────┘
+                         │
+                         ▼
+         ┌──────────────────────────────────────┐
+         │   Python NLP Service (FastAPI)       │
+         │   http://localhost:8000              │
+         │                                       │
+         │   - POST /dedupe                     │
+         │   - POST /similarity                 │
+         └──────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Legacy Python CLI                                  │
+│                    (JSON File Storage)                                  │
+│                                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
+│  │ Import   │  │ Dedupe   │  │ Campaign │  │  Audit   │              │
+│  │          │  │          │  │Generator │  │          │              │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Flow
@@ -140,3 +169,185 @@ Comprehensive logging of all operations:
 - Conflict detection
 - Timestamps and details
 - Queryable history
+
+## Modular Backend Architecture
+
+### Core Modules
+
+#### Import Module
+- **Purpose**: Handle CSV file uploads and import processing
+- **Endpoints**: POST /api/import/upload, GET /api/import, GET /api/import/:id/status
+- **Features**: File upload, import tracking, job queueing
+
+#### Dedupe Module
+- **Purpose**: Find and manage duplicate keywords
+- **Endpoints**: GET /api/dedupe/exact, GET /api/dedupe/fuzzy, GET /api/dedupe/conflicts
+- **Features**: Exact matching, fuzzy matching (Jaro-Winkler, Levenshtein), conflict detection
+
+#### Naming Module
+- **Purpose**: Generate campaign and ad group names using patterns
+- **Endpoints**: POST /api/naming/generate/campaign, POST /api/naming/generate/adgroup
+- **Features**: Token-based patterns, date formatting, preview mode
+
+#### Audit Module
+- **Purpose**: Comprehensive audit logging for all operations
+- **Endpoints**: POST /api/audit, GET /api/audit, GET /api/audit/stats
+- **Features**: Entity tracking, filtering, statistics, history queries
+
+#### Auth Module
+- **Purpose**: User authentication and authorization
+- **Endpoints**: POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
+- **Features**: JWT tokens, RBAC, guards, role-based access
+
+#### Queue Module
+- **Purpose**: Background job processing with BullMQ
+- **Features**: Import queue, export queue, job status tracking, retry logic
+
+### Background Processing
+
+#### Workers
+- **Import Processor**: Processes CSV imports asynchronously
+- **Export Processor**: Generates CSV exports in background
+- **Integration**: Calls Python NLP service for advanced deduplication
+
+### Python NLP Microservice
+
+**Technology**: FastAPI + Jellyfish
+**Endpoints**:
+- POST /dedupe: Fuzzy keyword deduplication
+- POST /similarity: Calculate similarity scores
+- GET /health: Health check
+
+**Algorithms**:
+- Jaro-Winkler similarity (default)
+- Levenshtein distance
+
+## Data Flow
+
+### 1. Modern Import Flow (Web App)
+```
+User Upload CSV → Backend API → Create Import Record → Enqueue Job
+                                                            ↓
+Worker → Read CSV → Parse → Normalize → Call Python NLP → Dedupe
+                                                            ↓
+                              Insert Keywords → Update Status → Audit Log
+```
+
+### 2. Legacy Import Flow (CLI)
+```
+CSV File → Parse → Normalize → Deduplicate → Store JSON → Audit Log
+```
+
+### 3. Campaign Generation Flow
+```
+Frontend → Backend API → Naming Service → Generate Names → Return to Frontend
+```
+
+### 4. Deduplication Flow
+```
+Backend → Dedupe Service → Python NLP Service → Return Duplicates
+```
+
+## Deployment
+
+### Development
+```bash
+docker-compose up
+```
+
+Starts all services:
+- PostgreSQL (port 5432)
+- Redis (port 6379)
+- Backend API (port 3001)
+- Frontend (port 3000)
+- Python NLP Service (port 8000)
+
+### Production
+Each service can be deployed independently:
+- Backend: Docker image `ghcr.io/ryandabao1982/kwbank-backend`
+- Frontend: Docker image `ghcr.io/ryandabao1982/kwbank-frontend`
+- Python NLP: Docker image `ghcr.io/ryandabao1982/kwbank-python-nlp`
+
+## CI/CD
+
+### GitHub Actions Workflows
+
+#### test-and-build.yml
+- Runs on: push to main/develop, PRs
+- Jobs: Backend tests, Frontend tests, Python NLP tests, OpenAPI generation
+- Services: PostgreSQL, Redis
+
+#### build-and-push-images.yml
+- Runs on: push to main, tags, manual trigger
+- Jobs: Build and push Docker images to GitHub Container Registry
+- Images: backend, frontend, python-nlp
+
+## Technology Stack
+
+### Backend
+- **Framework**: NestJS 11
+- **Language**: TypeScript
+- **ORM**: TypeORM
+- **Queue**: BullMQ
+- **Auth**: JWT + Passport
+
+### Frontend
+- **Framework**: Next.js 15
+- **Language**: TypeScript
+- **UI**: React + Tailwind CSS
+
+### Database
+- **Primary**: PostgreSQL 16
+- **Cache/Queue**: Redis 7
+
+### Python Service
+- **Framework**: FastAPI
+- **Libraries**: Jellyfish (fuzzy matching), Pydantic
+
+## Migration Path
+
+### From CLI to Web App
+1. Both interfaces can coexist
+2. CLI continues to use JSON storage
+3. Web app uses PostgreSQL
+4. Future: Migration utility to import JSON data to PostgreSQL
+
+### Adding New Modules
+1. Create module directory in `backend/src/`
+2. Add controller, service, module files
+3. Register in `app.module.ts`
+4. Add DTOs for validation
+5. Write tests
+
+## Security Considerations
+
+### Current Implementation
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Input validation with class-validator
+- CORS configuration
+- SQL injection prevention via TypeORM
+
+### Production Requirements
+- Enable HTTPS/TLS
+- Add rate limiting
+- Implement audit logging for all operations
+- Use environment-specific secrets
+- Enable database encryption at rest
+- Set up monitoring and alerting
+
+## Performance
+
+### Optimization Strategies
+- Redis caching for frequently accessed data
+- Background job processing for heavy operations
+- Database indexing on commonly queried fields
+- Connection pooling for database
+- Horizontal scaling of workers
+
+### Monitoring
+- Track job queue metrics
+- Monitor API response times
+- Database query performance
+- Error rates and logging
+

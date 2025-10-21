@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
@@ -24,11 +28,11 @@ export class ProductsService {
       where: { asin },
       relations: ['brand', 'mappings'],
     });
-    
+
     if (!product) {
       throw new NotFoundException(`Product with ASIN "${asin}" not found`);
     }
-    
+
     return product;
   }
 
@@ -36,16 +40,21 @@ export class ProductsService {
     const existingProduct = await this.productsRepository.findOne({
       where: { asin: createProductDto.asin },
     });
-    
+
     if (existingProduct) {
-      throw new ConflictException(`Product with ASIN "${createProductDto.asin}" already exists`);
+      throw new ConflictException(
+        `Product with ASIN "${createProductDto.asin}" already exists`,
+      );
     }
-    
+
     const product = this.productsRepository.create(createProductDto);
     return this.productsRepository.save(product);
   }
 
-  async update(asin: string, updateProductDto: UpdateProductDto): Promise<Product> {
+  async update(
+    asin: string,
+    updateProductDto: UpdateProductDto,
+  ): Promise<Product> {
     const product = await this.findOne(asin);
     Object.assign(product, updateProductDto);
     return this.productsRepository.save(product);

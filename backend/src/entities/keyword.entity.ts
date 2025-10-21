@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Brand } from './brand.entity';
 
 export enum MatchType {
@@ -70,7 +77,7 @@ export class Keyword {
   @CreateDateColumn()
   created_at: Date;
 
-  @ManyToOne(() => Brand, brand => brand.keywords)
+  @ManyToOne(() => Brand, (brand) => brand.keywords)
   @JoinColumn({ name: 'brand_id' })
   brand: Brand;
 }
