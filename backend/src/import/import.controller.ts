@@ -12,11 +12,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { ImportService } from './import.service';
+import { QueueService } from '../queue/queue.service';
 import { CreateImportDto } from './dto/import.dto';
 
 @Controller('import')
 export class ImportController {
-  constructor(private readonly importService: ImportService) {}
+  constructor(
+    private readonly importService: ImportService,
+    private readonly queueService: QueueService,
+  ) {}
 
   @Post('upload')
   @UseInterceptors(
@@ -57,17 +61,17 @@ export class ImportController {
 
     const importRecord = await this.importService.create(createImportDto);
 
-    // TODO: Enqueue job for processing
-    // await this.queueService.addImportJob({
-    //   import_id: importRecord.id,
-    //   file_path: file.path,
-    //   brand_id,
-    // });
+    // Enqueue job for processing
+    const jobId = await this.queueService.addImportJob({
+      import_id: importRecord.id,
+      file_path: file.path,
+      brand_id,
+    });
 
     return {
-      message: 'File uploaded successfully',
+      message: 'File uploaded successfully and queued for processing',
       import: importRecord,
-      job_id: importRecord.id,
+      job_id: jobId,
     };
   }
 

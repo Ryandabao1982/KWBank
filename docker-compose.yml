@@ -24,7 +24,7 @@ services:
     networks:
       - kwbank-network
 
-  # Redis Cache
+  # Redis Cache & Queue
   redis:
     image: redis:7-alpine
     container_name: kwbank-redis
@@ -40,52 +40,77 @@ services:
     networks:
       - kwbank-network
 
+  # Python NLP Microservice
+  python-nlp:
+    build:
+      context: ./python-nlp
+      dockerfile: Dockerfile
+    container_name: kwbank-python-nlp
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kwbank-network
+
   # Backend API (NestJS)
-  # Uncomment to run backend in Docker (requires backend image to be built)
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: kwbank-backend
-  #   ports:
-  #     - "3001:3001"
-  #   environment:
-  #     - NODE_ENV=development
-  #     - DB_HOST=postgres
-  #     - DB_PORT=5432
-  #     - DB_USERNAME=kwbank
-  #     - DB_PASSWORD=kwbank
-  #     - DB_NAME=kwbank
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - kwbank-network
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kwbank-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=kwbank
+      - DB_PASSWORD=kwbank
+      - DB_NAME=kwbank
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-nlp:
+        condition: service_started
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - kwbank-network
 
   # Frontend (Next.js)
-  # Uncomment to run frontend in Docker (requires frontend image to be built)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: kwbank-frontend
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://localhost:3001/api
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - kwbank-network
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kwbank-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    depends_on:
+      - backend
+    networks:
+      - kwbank-network
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  backend_uploads:
     driver: local
 
 networks:

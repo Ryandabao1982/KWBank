@@ -12,6 +12,8 @@ import { DedupeModule } from './dedupe/dedupe.module';
 import { NamingModule } from './naming/naming.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { QueueModule } from './queue/queue.module';
+import { WorkerModule } from './worker/worker.module';
 import configuration from './config/configuration';
 import { Brand } from './entities/brand.entity';
 import { Product } from './entities/product.entity';
@@ -52,6 +54,7 @@ import { User } from './entities/user.entity';
       }),
       inject: [ConfigService],
     }),
+    QueueModule,
     BrandsModule,
     ProductsModule,
     KeywordsModule,
@@ -61,6 +64,7 @@ import { User } from './entities/user.entity';
     NamingModule,
     AuditModule,
     AuthModule,
+    WorkerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
