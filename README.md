@@ -3,6 +3,14 @@
 **Keyword Bank** centralizes keyword operations — import, deduplication, mapping, and campaign generation — into one intuitive tool.  
 It helps brands scale Amazon PPC campaigns without duplication, confusion, or wasted spend.
 
+## 🚀 What's Next?
+
+**Current Status**: Foundation complete with modular backend, REST API, and UI framework  
+**Next Phase**: Frontend-Backend Integration & Feature Completion
+
+👉 **New Developers**: Start with [QUICK_START_NEXT.md](./QUICK_START_NEXT.md) for immediate next steps  
+📋 **Full Roadmap**: See [NEXT_STEPS.md](./NEXT_STEPS.md) for detailed development plan
+
 ## Core Features
 
 ✅ **Multi-brand keyword storage** - Store and manage keywords for multiple brands in one centralized location  
