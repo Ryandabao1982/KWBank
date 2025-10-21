@@ -20,7 +20,7 @@ export class ExportProcessor extends WorkerHost {
       // 5. Return URL to frontend
 
       this.logger.log(`Export job ${job.id} completed successfully`);
-      
+
       return {
         export_id,
         status: 'completed',

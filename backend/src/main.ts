@@ -1,30 +1,14 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import helmet from 'helmet';
+import * as process from 'process';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
-  // Enable CORS for frontend
-  app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-    credentials: true,
-  });
-
-  // Enable validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
-
-  // API prefix
-  app.setGlobalPrefix('api');
-
+  app.use(helmet());
+  app.enableCors({ origin: '*' });
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`🚀 Backend server running on http://localhost:${port}`);
-  console.log(`📚 API available at http://localhost:${port}/api`);
+  console.log(`Backend listening on ${port}`);
 }
 void bootstrap();
