@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Brand } from '../entities/brand.entity';
@@ -22,11 +26,11 @@ export class BrandsService {
       where: { brand_id },
       relations: ['products', 'keywords'],
     });
-    
+
     if (!brand) {
       throw new NotFoundException(`Brand with ID "${brand_id}" not found`);
     }
-    
+
     return brand;
   }
 
@@ -34,16 +38,21 @@ export class BrandsService {
     const existingBrand = await this.brandsRepository.findOne({
       where: { brand_id: createBrandDto.brand_id },
     });
-    
+
     if (existingBrand) {
-      throw new ConflictException(`Brand with ID "${createBrandDto.brand_id}" already exists`);
+      throw new ConflictException(
+        `Brand with ID "${createBrandDto.brand_id}" already exists`,
+      );
     }
-    
+
     const brand = this.brandsRepository.create(createBrandDto);
     return this.brandsRepository.save(brand);
   }
 
-  async update(brand_id: string, updateBrandDto: UpdateBrandDto): Promise<Brand> {
+  async update(
+    brand_id: string,
+    updateBrandDto: UpdateBrandDto,
+  ): Promise<Brand> {
     const brand = await this.findOne(brand_id);
     Object.assign(brand, updateBrandDto);
     return this.brandsRepository.save(brand);

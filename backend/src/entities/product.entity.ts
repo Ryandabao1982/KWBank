@@ -1,4 +1,12 @@
-import { Entity, Column, PrimaryColumn, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { Brand } from './brand.entity';
 import { Mapping } from './mapping.entity';
 
@@ -22,10 +30,10 @@ export class Product {
   @CreateDateColumn()
   created_at: Date;
 
-  @ManyToOne(() => Brand, brand => brand.products)
+  @ManyToOne(() => Brand, (brand) => brand.products)
   @JoinColumn({ name: 'brand_id' })
   brand: Brand;
 
-  @OneToMany(() => Mapping, mapping => mapping.product)
+  @OneToMany(() => Mapping, (mapping) => mapping.product)
   mappings: Mapping[];
 }

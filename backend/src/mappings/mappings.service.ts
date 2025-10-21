@@ -15,7 +15,7 @@ export class MappingsService {
     const where: any = {};
     if (asin) where.asin = asin;
     if (keyword) where.keyword = keyword;
-    
+
     return this.mappingsRepository.find({
       where,
       relations: ['product'],
@@ -28,11 +28,11 @@ export class MappingsService {
       where: { id },
       relations: ['product'],
     });
-    
+
     if (!mapping) {
       throw new NotFoundException(`Mapping with ID "${id}" not found`);
     }
-    
+
     return mapping;
   }
 
@@ -41,7 +41,10 @@ export class MappingsService {
     return this.mappingsRepository.save(mapping);
   }
 
-  async update(id: string, updateMappingDto: UpdateMappingDto): Promise<Mapping> {
+  async update(
+    id: string,
+    updateMappingDto: UpdateMappingDto,
+  ): Promise<Mapping> {
     const mapping = await this.findOne(id);
     Object.assign(mapping, updateMappingDto);
     return this.mappingsRepository.save(mapping);

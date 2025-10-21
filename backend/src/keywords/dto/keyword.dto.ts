@@ -1,5 +1,17 @@
-import { IsString, IsEnum, IsNumber, IsOptional, IsArray, Min } from 'class-validator';
-import { MatchType, KeywordType, KeywordIntent, KeywordStatus } from '../../entities/keyword.entity';
+import {
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  Min,
+} from 'class-validator';
+import {
+  MatchType,
+  KeywordType,
+  KeywordIntent,
+  KeywordStatus,
+} from '../../entities/keyword.entity';
 
 export class CreateKeywordDto {
   @IsString()

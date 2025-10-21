@@ -1,7 +1,28 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { KeywordsService } from './keywords.service';
-import { Keyword, MatchType, KeywordType, KeywordIntent, KeywordStatus } from '../entities/keyword.entity';
-import { CreateKeywordDto, UpdateKeywordDto, KeywordFilters } from './dto/keyword.dto';
+import {
+  Keyword,
+  MatchType,
+  KeywordType,
+  KeywordIntent,
+  KeywordStatus,
+} from '../entities/keyword.entity';
+import {
+  CreateKeywordDto,
+  UpdateKeywordDto,
+  KeywordFilters,
+} from './dto/keyword.dto';
 
 @Controller('keywords')
 export class KeywordsController {
@@ -55,7 +76,9 @@ export class KeywordsController {
 
   @Post('batch')
   @HttpCode(HttpStatus.CREATED)
-  async createBatch(@Body() createKeywordDtos: CreateKeywordDto[]): Promise<Keyword[]> {
+  async createBatch(
+    @Body() createKeywordDtos: CreateKeywordDto[],
+  ): Promise<Keyword[]> {
     return this.keywordsService.createBatch(createKeywordDtos);
   }
 

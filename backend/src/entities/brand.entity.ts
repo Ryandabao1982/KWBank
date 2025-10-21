@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryColumn, CreateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  CreateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { Product } from './product.entity';
 import { Keyword } from './keyword.entity';
 
@@ -28,9 +34,9 @@ export class Brand {
   @CreateDateColumn()
   created_at: Date;
 
-  @OneToMany(() => Product, product => product.brand)
+  @OneToMany(() => Product, (product) => product.brand)
   products: Product[];
 
-  @OneToMany(() => Keyword, keyword => keyword.brand)
+  @OneToMany(() => Keyword, (keyword) => keyword.brand)
   keywords: Keyword[];
 }

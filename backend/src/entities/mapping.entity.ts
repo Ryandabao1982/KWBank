@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Product } from './product.entity';
 
 @Entity('mappings')
@@ -27,7 +34,7 @@ export class Mapping {
   @CreateDateColumn()
   created_at: Date;
 
-  @ManyToOne(() => Product, product => product.mappings)
+  @ManyToOne(() => Product, (product) => product.mappings)
   @JoinColumn({ name: 'asin' })
   product: Product;
 }
